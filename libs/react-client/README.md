@@ -19,7 +19,7 @@ import { RecoilRoot } from 'recoil';
 
 import { ChainlitAPI, ChainlitContext } from '@chainlit/react-client';
 
-const CHAINLIT_SERVER_URL = 'http://localhost:8000';
+const CHAINLIT_SERVER_URL = 'http://localhost:8080';
 
 const apiClient = new ChainlitAPI(CHAINLIT_SERVER_URL, 'webapp');
 
