@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 
-import { useChatInteract } from '@chainlit/react-client';
-
 import { Translator } from '@/components/i18n';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,14 +19,19 @@ import {
 
 import { EditSquare } from '../icons/EditSquare';
 
+// This is the dialog component. It's mostly unchanged.
 type NewChatDialogProps = {
   open: boolean;
+  isLoading: boolean;
+  error?: string | null;
   handleClose: () => void;
   handleConfirm: () => void;
 };
 
 export const NewChatDialog = ({
   open,
+  isLoading,
+  error,
   handleClose,
   handleConfirm
 }: NewChatDialogProps) => {
@@ -43,12 +46,22 @@ export const NewChatDialog = ({
             <Translator path="navigation.newChat.dialog.description" />
           </DialogDescription>
         </DialogHeader>
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             <Translator path="common.actions.cancel" />
           </Button>
-          <Button variant="default" onClick={handleConfirm} id="confirm">
-            <Translator path="common.actions.confirm" />
+          <Button
+            variant="default"
+            onClick={handleConfirm}
+            id="confirm"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Translator path="common.actions.loading" />
+            ) : (
+              <Translator path="common.actions.confirm" />
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -56,26 +69,49 @@ export const NewChatDialog = ({
   );
 };
 
-interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  navigate?: (to: string) => void;
-}
-
-const NewChatButton = ({ navigate, ...buttonProps }: Props) => {
+// This is the main button component with the simplified logic.
+const NewChatButton = ({
+  ...buttonProps
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
   const [open, setOpen] = useState(false);
-  const { clear } = useChatInteract();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleClickOpen = () => {
+    setError(null);
     setOpen(true);
   };
 
   const handleClose = () => {
+    if (isLoading) return;
     setOpen(false);
   };
 
-  const handleConfirm = () => {
-    clear();
-    navigate?.('/');
-    handleClose();
+  // --- THIS IS THE SIMPLIFIED LOGIC ---
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Make a single, direct call to the clear history endpoint.
+      const res = await fetch('/api/clear-history', {
+        method: 'POST',
+        // CRUCIAL: This sends the user's session cookie for authentication.
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        // Handle potential errors like not being logged in (401/403)
+        throw new Error(`Failed to clear history (status: ${res.status})`);
+      }
+
+      // On success, reload the page to start the new session.
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Clear history failed:', err);
+      setError(err.message || 'An unknown error occurred.');
+      setIsLoading(false); // Stop loading so the user can see the error
+    }
   };
 
   return (
@@ -101,6 +137,8 @@ const NewChatButton = ({ navigate, ...buttonProps }: Props) => {
       </TooltipProvider>
       <NewChatDialog
         open={open}
+        isLoading={isLoading}
+        error={error}
         handleClose={handleClose}
         handleConfirm={handleConfirm}
       />
